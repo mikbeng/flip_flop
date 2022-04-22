@@ -36,14 +36,15 @@ col_pin_map = {
         'A2': digitalio.DigitalInOut(board.GP8),    #Connect to A2_cols header pin 15
         'A3': digitalio.DigitalInOut(board.GP9),    #Connect to 2A/2B header pin 18. INVERTED
     },
-    'output': {
+    'output_r': {
         'C1_r': 1<<1,    #Q1
         'C2_r': 1<<2,    #Q2
         'C3_r': 1<<3,    #Q3
         'C4_r': 1<<4,    #Q4   
         'C5_r': 1<<5,    #Q5
         'C6_r': 1<<6,    #Q6
-        'C7_r': 1<<7,    #Q7     
+        'C7_r': 1<<7,    #Q7
+    'output_s': {
         'C1_s': 1<<9,    #Q9
         'C2_s': 1<<10,    #Q10
         'C3_s': 1<<11,    #Q11
@@ -51,6 +52,7 @@ col_pin_map = {
         'C5_s': 1<<13,    #Q13
         'C6_s': 1<<14,    #Q14
         'C7_s': 1<<15,    #Q15
+        }
     }
 }
 
@@ -61,7 +63,7 @@ row_pin_map = {
         'A2': digitalio.DigitalInOut(board.GP12),   #Connect to A2_rows header pin 6
         'A3': digitalio.DigitalInOut(board.GP13),   #not used?
     },
-    'output': {
+    'output_r': {
         'R1_r': 1<<1,    #Q1
         'R2_r': 1<<2,    #Q2
         'R3_r': 1<<3,    #Q3
@@ -69,6 +71,7 @@ row_pin_map = {
         'R5_r': 1<<5,    #Q5
         'R6_r': 1<<6,    #Q6
         'R7_r': 1<<7,    #Q7
+    'output_s': {
         'R1_s': 1<<9,    #Q9
         'R2_s': 1<<10,    #Q10
         'R3_s': 1<<11,    #Q11
@@ -76,6 +79,7 @@ row_pin_map = {
         'R5_s': 1<<13,    #Q13
         'R6_s': 1<<14,    #Q14
         'R7_s': 1<<15,    #Q15
+        }
     }
 }
 
@@ -91,12 +95,12 @@ enable_pin_map = {
     },
     'output': {
         'E_row1': 0,
-        'E_row2': 2,
-        'E_row3': 1,       
+        'E_row2': 1,
+        'E_row3': 2,       
         'E_row4': 3,
         'E_col1': 0,   
-        'E_col3': 1, 
-        'E_col2': 2, 
+        'E_col2': 1, 
+        'E_col3': 2, 
         'E_col4': 3,
     }              
 }
@@ -263,8 +267,9 @@ class Demux_74HC139:
 
         output = ~(0b0001<<output_pos) & 0xF
         input = self.encode(output) #Input corresponds to the states of A0 and A1 as: 0bA1A0
-        level_A0 = (input>>0) & 0b1
-        level_A1 = (input>>1) & 0b1
+        level_A0 = bool((input>>0) & 0b1)
+        level_A1 = bool((input>>1) & 0b1)
+        
 
         #enable gpios
         print('pin_{}A0={}'.format(ch,level_A0))
@@ -272,10 +277,10 @@ class Demux_74HC139:
 
         if ch == 1:
             self.pin_1A0.value = level_A0
-            self.pin_1A0.value = level_A1
+            self.pin_1A1.value = level_A1
         elif ch == 2:
             self.pin_2A0.value = level_A0
-            self.pin_2A0.value = level_A1
+            self.pin_2A1.value = level_A1
         else:
             raise ValueError('invalid ch number')
 
@@ -307,6 +312,8 @@ def main():
 
     print('Hello World!')
 
+    pulse_sleep = 0.1
+
     enable = Demux_74HC139(enable_pin_map)
     enable.set_output(1,enable_pin_map['output']['E_row1'])
     enable.set_output(2,enable_pin_map['output']['E_col1'])
@@ -317,20 +324,25 @@ def main():
     #Only half the board seems to be working. ?
 
     col_demux = demux_74HC4514(col_pin_map)
-    col_demux.set_output_inv(col_pin_map['output']['C1_s'])
+    col_demux.set_output_inv(col_pin_map['output_s']['C1_s'])
 
     row_demux = demux_74HC4514(row_pin_map)
-    row_demux.set_output(row_pin_map['output']['R1_s'])
+    row_demux.set_output(row_pin_map['output_r']['R1_r'])
 
     #Row enable, this will be held enabled from now
     enable.enable_output(1)
 
     #Col enable, this sends a pulse 
-    enable.enable_output(2)
-    time.sleep(1)
-    enable.disable_output(2)
-
-
+    #enable.enable_output(2)
+    #time.sleep(pulse_sleep)
+    #enable.disable_output(2)
+    col_r =  col_pin_map['output_s']
+    for key in col_r:
+        col_demux.set_output_inv(col_r[key])
+        print(key, '->', col_r[key])
+        enable.enable_output(2)
+        time.sleep(pulse_sleep)
+        enable.disable_output(2)
     #Call enable.enable_output() after all is set up.
 
 
